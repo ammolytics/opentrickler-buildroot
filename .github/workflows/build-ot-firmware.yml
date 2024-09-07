@@ -60,7 +60,7 @@ jobs:
           pip install --upgrade pip
           pip freeze
           pip install wheel
-          pip install bluezero pybleno pyserial gpiozero pymemcache RPi.GPIO grpcio
+          pip install bluezero==0.8.0 pybleno pyserial gpiozero pymemcache RPi.GPIO grpcio
           deactivate
 
       - name: Build firmware
