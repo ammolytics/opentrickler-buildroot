@@ -49,7 +49,7 @@ python -m ensurepip --upgrade || true
 which pip || true
 pip install --upgrade pip
 pip install wheel
-pip install bluezero pybleno pyserial gpiozero pymemcache RPi.GPIO grpcio
+pip install bluezero==0.8.0 pybleno pyserial gpiozero pymemcache RPi.GPIO grpcio
 
 # Deactivate new python venv
 deactivate
