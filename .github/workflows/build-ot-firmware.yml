@@ -1,0 +1,91 @@
+# Build the Open Trickler firmware images
+
+name: build-ot-firmware
+
+# Controls when the workflow will run
+on:
+  # Note(eric): Disabled for now in favor of cron. Run on commits to existing PR.
+  #pull_request:
+  #  types: [labeled, synchronize]
+  # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule
+  schedule:
+    # Monday at 1:00pm UTC which is usually 6:00am Pacific
+    - cron: '0 13 * * 1'
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  firmware-build:
+    # The type of runner that the job will run on
+    runs-on: self-hosted
+
+    # Define the firmware matrix to build
+    strategy:
+      matrix:
+        board: [pi0w_dev, pizero2w_dev, pi0w_prod, pi3_dev]
+
+    outputs:
+      date: ${{ steps.date.outputs.date }}
+      sha: ${{ steps.sha.outputs.sha }}
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+
+      - id: date
+        run: echo "::set-output name=date::$(date +'%Y%m%d')"
+
+      - id: sha
+        run: echo "::set-output name=sha::${GITHUB_SHA:0:7}"
+      
+      - name: Python pre-flight check
+        run: |
+          pwd
+          ls -al
+          whoami
+          which python3
+          python3 --version
+          which pip3 || true
+          pip3 --version || true
+          pip3 freeze || true
+          python3 -m pip --version || true
+          python3 -m venv tmp-venv
+          . tmp-venv/bin/activate
+          which python
+          python --version
+          python -m ensurepip --upgrade
+          which pip
+          pip install --upgrade pip
+          pip freeze
+          pip install wheel
+          pip install bluezero==0.8.0 pybleno pyserial gpiozero pymemcache RPi.GPIO grpcio
+          deactivate
+
+      - name: Build firmware
+        run: |
+          make opentrickler_${{ matrix.board }}_defconfig
+          make -j35
+          
+      - name: Package firmware image
+        run: |
+          ls -al output/images/
+          cp output/images/sdcard.img .
+          xz --keep --force sdcard.img
+          mv sdcard.img.xz opentrickler-${{ matrix.board }}-${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}.img.xz
+          shasum -a 256 opentrickler-${{ matrix.board }}-${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}.img.xz > shasum.txt
+          ls -al *sdcard.img*
+          du -sh *sdcard.img*
+            
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.board }} firmware
+          path: |
+            opentrickler-${{ matrix.board }}-${{ steps.date.outputs.date }}-${{ steps.sha.outputs.sha }}.img.xz
+            shasum.txt
+
+      - name: Garbage collection
+        run: |
+          make clean
+          rm shasum.txt *.img *.img.xz
